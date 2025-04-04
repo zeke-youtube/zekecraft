@@ -3,20 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Zekecraft Web 1.2</title>
+    <title>Zekecraft</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/simplex-noise"></script>
     <style>
         body {
             margin: 0;
             overflow: hidden;
-            background: #87CEEB; /* Sky blue */
+            background: #87CEEB;
         }
 
         canvas {
             display: block;
         }
 
-        #gameMenu {
+        #craftingMenu {
             display: none;
             position: absolute;
             top: 50%;
@@ -26,156 +27,131 @@
             color: white;
             padding: 20px;
             border-radius: 10px;
-            text-align: center;
+            font-family: Arial, sans-serif;
         }
 
-        #gameMenu button {
+        #craftingMenu h1 {
+            color: #FFD700;
+        }
+
+        #craftingMenu button {
             margin: 10px;
             padding: 10px 20px;
-            font-size: 16px;
+            background: #FFD700;
+            border: none;
+            border-radius: 5px;
+            color: black;
+            cursor: pointer;
         }
     </style>
 </head>
 <body>
     <canvas id="gameCanvas"></canvas>
-    <div id="gameMenu">
-        <h1>Game Menu</h1>
-        <button onclick="resumeGame()">Resume</button>
-        <button onclick="saveWorld()">Save World</button>
-        <button onclick="loadWorld()">Load World</button>
-        <button onclick="exitGame()">Exit</button>
+    <div id="craftingMenu">
+        <h1>Crafting Menu</h1>
+        <button onclick="craft('wooden_pickaxe')">Craft Wooden Pickaxe</button>
+        <button onclick="closeCraftingMenu()">Close</button>
     </div>
     <script>
-        // Initialize Three.js Scene
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('gameCanvas') });
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
-        // Lighting
         const light = new THREE.DirectionalLight(0xffffff, 1);
-        light.position.set(10, 10, 10);
+        light.position.set(10, 20, 15);
         scene.add(light);
 
-        // Texture Loader
         const textureLoader = new THREE.TextureLoader();
         const blockTypes = {
             grass: textureLoader.load('textures/grass_block.png'),
             dirt: textureLoader.load('textures/dirt_block.png'),
             stone: textureLoader.load('textures/stone_block.png'),
             sand: textureLoader.load('textures/sand_block.png'),
-            oak_log: textureLoader.load('textures/oak_log.png'),
-            ice: textureLoader.load('textures/ice_block.png'),
-            netherrack: textureLoader.load('textures/netherrack_block.png'),
-            glowstone: textureLoader.load('textures/glowstone_block.png'),
-            soul_sand: textureLoader.load('textures/soul_sand.png'),
-            mossy_cobblestone: textureLoader.load('textures/mossy_cobblestone.png'),
-            subscribe_to_zeke: textureLoader.load('textures/subscribe_block.png') // Special block
+            crafting_table: textureLoader.load('textures/crafting_table.png'),
+            oak_log: textureLoader.load('textures/oak_log_block.png'),
+            foliage: textureLoader.load('textures/foliage_block.png'),
+            subscribe_to_zeke: textureLoader.load('textures/subscribe_block.png')
         };
 
-        // Function to Create Blocks
-        const createBlock = (x, y, z, texture, specialAction = null) => {
+        function createBlock(x, y, z, texture, action = null) {
             const geometry = new THREE.BoxGeometry(1, 1, 1);
             const material = new THREE.MeshBasicMaterial({ map: texture });
             const block = new THREE.Mesh(geometry, material);
             block.position.set(x, y, z);
             scene.add(block);
 
-            // Add special action for the block (right-click)
-            if (specialAction) {
-                block.userData = { action: specialAction };
-            }
-        };
+            if (action) block.userData.action = action;
+        }
 
-        // Add Blocks to Scene
-        createBlock(0, 0, 0, blockTypes.grass);
-        createBlock(1, 0, 0, blockTypes.dirt);
-        createBlock(2, 0, 0, blockTypes.stone);
-        createBlock(3, 0, 0, blockTypes.sand);
-        createBlock(6, 0, 0, blockTypes.oak_log);
-        createBlock(7, 0, 0, blockTypes.ice);
-        createBlock(8, 0, 0, blockTypes.netherrack);
-        createBlock(9, 0, 0, blockTypes.glowstone);
-        createBlock(10, 0, 0, blockTypes.soul_sand);
-        createBlock(11, 0, 0, blockTypes.mossy_cobblestone);
-        createBlock(12, 0, 0, blockTypes.subscribe_to_zeke, () => {
+        function generateTerrain(size) {
+            const noise = new SimplexNoise();
+            for (let x = -size / 2; x < size / 2; x++) {
+                for (let z = -size / 2; z < size / 2; z++) {
+                    const height = Math.floor(noise.noise2D(x / 10, z / 10) * 5);
+                    const texture = height > 2 ? blockTypes.stone : height > 0 ? blockTypes.dirt : blockTypes.grass;
+                    createBlock(x, height, z, texture);
+                }
+            }
+        }
+
+        function generateTree(x, y, z) {
+            createBlock(x, y, z, blockTypes.oak_log);
+            createBlock(x, y + 1, z, blockTypes.oak_log);
+            createBlock(x, y + 2, z, blockTypes.foliage);
+            createBlock(x + 1, y + 2, z, blockTypes.foliage);
+            createBlock(x - 1, y + 2, z, blockTypes.foliage);
+        }
+
+        generateTerrain(50);
+
+        createBlock(0, 10, 0, blockTypes.crafting_table, openCraftingMenu);
+        createBlock(0, 20, 0, blockTypes.subscribe_to_zeke, () => {
             window.open('https://zeke-youtube.github.io/zeke-web', '_blank');
         });
 
-        // Mouse Lock
-        document.addEventListener('click', () => {
-            const canvas = document.getElementById('gameCanvas');
-            canvas.requestPointerLock();
-        });
+        camera.position.set(25, 25, 50);
+        camera.lookAt(0, 0, 0);
 
-        document.addEventListener('mousemove', (event) => {
-            if (document.pointerLockElement) {
-                camera.rotation.y -= event.movementX * 0.002;
-                camera.rotation.x -= event.movementY * 0.002;
-            }
-        });
-
-        // Game Menu
-        document.addEventListener('keydown', (event) => {
-            if (event.key === 'Escape') {
-                document.exitPointerLock(); // Unlock mouse
-                toggleGameMenu();
-            }
-        });
-
-        function toggleGameMenu() {
-            const menu = document.getElementById('gameMenu');
-            if (menu.style.display === 'none') {
-                menu.style.display = 'block';
-            } else {
-                menu.style.display = 'none';
-            }
-        }
-
-        function resumeGame() {
-            document.getElementById('gameMenu').style.display = 'none';
-            document.getElementById('gameCanvas').requestPointerLock(); // Relock mouse
-        }
-
-        function saveWorld() {
-            const blocks = [];
-            scene.children.forEach(child => {
-                if (child.geometry && child.material.map) {
-                    blocks.push({
-                        position: child.position,
-                        texture: child.material.map.image.src // Save the texture path
-                    });
-                }
-            });
-            localStorage.setItem('zekecraftWorld', JSON.stringify(blocks));
-            alert('World saved!');
-        }
-
-        function loadWorld() {
-            const savedBlocks = JSON.parse(localStorage.getItem('zekecraftWorld') || '[]');
-            savedBlocks.forEach(blockData => {
-                const texture = textureLoader.load(blockData.texture);
-                createBlock(blockData.position.x, blockData.position.y, blockData.position.z, texture);
-            });
-            alert('World loaded!');
-        }
-
-        function exitGame() {
-            alert('Exiting Zekecraft...');
-            window.close(); // Only works for tabs opened via script
-        }
-
-        // Camera Position
-        camera.position.set(5, 5, 15);
-        camera.lookAt(5, 0, 0);
-
-        // Animate Scene
         function animate() {
             requestAnimationFrame(animate);
             renderer.render(scene, camera);
         }
         animate();
+
+        function openCraftingMenu() {
+            document.getElementById('craftingMenu').style.display = 'block';
+        }
+
+        function closeCraftingMenu() {
+            document.getElementById('craftingMenu').style.display = 'none';
+        }
+
+        const inventory = { wood: 5, stone: 3 };
+        const recipes = {
+            wooden_pickaxe: { wood: 3 }
+        };
+
+        function craft(item) {
+            const recipe = recipes[item];
+            let canCraft = true;
+
+            for (let material in recipe) {
+                if (inventory[material] < recipe[material]) {
+                    canCraft = false;
+                    alert(`Not enough ${material}`);
+                    break;
+                }
+            }
+
+            if (canCraft) {
+                for (let material in recipe) {
+                    inventory[material] -= recipe[material];
+                }
+                alert(`${item} crafted successfully!`);
+            }
+        }
     </script>
 </body>
 </html>
